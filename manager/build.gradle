@@ -1,0 +1,59 @@
+plugins {
+    id 'org.springframework.boot' version '3.0.6'
+    id 'java'
+}
+
+apply plugin: 'io.spring.dependency-management'
+
+
+group 'ru.stepanoff'
+version '1.0-SNAPSHOT'
+sourceCompatibility = '17'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    //spring
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // security
+    implementation 'org.springframework.security:spring-security-crypto:6.0.2'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'com.auth0:java-jwt:4.3.0'
+
+    // kafka
+    implementation 'org.apache.kafka:kafka-clients:3.4.0'
+
+    // logging
+    implementation 'ch.qos.logback:logback-classic:1.4.7'
+
+    // code generator
+    compileOnly 'org.projectlombok:lombok:1.18.26'
+    annotationProcessor 'org.projectlombok:lombok:1.18.26'
+
+    //spring validation
+    implementation 'org.springframework.boot:spring-boot-starter-validation:3.0.5'
+
+    //spring jpa
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa:3.0.5'
+
+    // databases
+    implementation 'org.postgresql:postgresql:42.5.4'
+
+    //open api, swagger
+    implementation group: 'org.springdoc', name: 'springdoc-openapi-starter-webmvc-ui', version: '2.0.2'
+    implementation 'io.swagger:swagger-models:1.6.10'
+
+    // mapper
+    implementation 'org.modelmapper:modelmapper:3.1.1'
+
+    // test
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+}
+
+test {
+    useJUnitPlatform()
+}

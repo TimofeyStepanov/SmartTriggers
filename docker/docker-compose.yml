@@ -1,0 +1,225 @@
+version: '3.7'
+
+services:
+
+  manager:
+    build: managerBuild/
+    container_name: manager
+    ports:
+      - 8080:8080
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/postgres
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=pgpwd4habr
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+
+    
+  consumer:
+    build: consumerBuild/
+    container_name: consumer
+    ports:
+      - 8082:8082
+    environment:
+      - SPRING_R2DBC_URL=r2dbc:postgresql://postgres:5432/postgres
+      - SPRING_R2DBC_USERNAME=postgres
+      - SPRING_R2DBC_PASSWORD=pgpwd4habr
+      - SPRING_DATA_R2DBC_REPOSITORIES_ENABLED=true
+      - APPLICATION_SERVERURL=http://processor:8083/ 
+
+      - POSTGRES_CHANNELNAME=consumer_event
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=pgpwd4habr
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+      - kafka
+
+
+  processor:
+    build: processorBuild/
+    container_name: processor
+    ports:
+      - 8083:8083
+    environment:
+      - APPLICATION_CACHESIZE=2
+      - APPLICATION_PRODUCERURL=http://producer:8084/user
+
+      - SPRING_R2DBC_URL=r2dbc:postgresql://postgres:5432/postgres
+      - SPRING_R2DBC_USERNAME=postgres
+      - SPRING_R2DBC_PASSWORD=pgpwd4habr
+      - SPRING_DATA_R2DBC_REPOSITORIES_ENABLED=true
+
+      - POSTGRES_CHANNELNAME=processor_event
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=pgpwd4habr
+
+      - CASSANDRA_NODE=cassandra
+      - CASSANDRA_PORT=9042
+      - CASSANDRA_KEYSPACENAME=MY_KEYSPACE
+      - CASSANDRA_STRATEGY=SimpleStrategy
+      - CASSANDRA_REPLICATIONFACTOR=1
+      - CASSANDRA_TABLENAME=USER_TABLE
+
+      - CLICKHOUSE_URL=jdbc:clickhouse://clickhouse-server:8123
+      - CLICKHOUSE_USERNAME=default
+      - CLICKHOUSE_GEOTABLENAME=Geo
+      - CLICKHOUSE_LINKTABLENAME=Link
+      - CLICKHOUSE_CALLTABLENAME=Call_table
+
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+      - kafka
+      - cassandra
+      - redis
+      - clickhouse-server
+
+
+  producer:
+    build: producerBuild/
+    container_name: producer
+    ports:
+      - 8084:8084
+    environment:
+      - SPRING_R2DBC_URL=r2dbc:postgresql://postgres:5432/postgres
+      - SPRING_R2DBC_USERNAME=postgres
+      - SPRING_R2DBC_PASSWORD=pgpwd4habr
+      - SPRING_DATA_R2DBC_REPOSITORIES_ENABLED=true
+
+      - POSTGRES_CHANNELNAME=producer_event
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=pgpwd4habr
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+      - kafka
+
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana-storage:/var/lib/grafana
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB : "postgres"
+      POSTGRES_PASSWORD: "pgpwd4habr"
+    ports:
+      - "5432:5432"
+    volumes: 
+      - ./postgres.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    networks:
+      - node-network
+
+  
+  cassandra:
+    image: cassandra:4.0
+    container_name: cassandra
+    ports:
+      - 9042:9042
+    networks:
+      - node-network
+
+    
+  clickhouse-server:
+    image: yandex/clickhouse-server
+    container_name: clickhouse-server
+    ports:
+      - '8123:8123'
+    #volumes:
+      #- ./db:/var/lib/clickhouse
+      # - C:/Users/Timofey.LAPTOP-KQGJSA46/Desktop/diplom/clickhouse.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    networks:
+      - node-network
+
+    
+  redis:
+    image: 'bitnami/redis:latest'
+    container_name: redis  # Контейнеру можно задать имя
+    environment: # переменные окружения. Говорим, что подключаемся без пароля
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+    networks:
+      - node-network
+    ports:  # Порт на котором будет поднят контейнер редис
+      - '6379:6379'
+
+
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - node-network
+      
+  kafka:
+    image: docker.io/bitnami/kafka:3.3.1-debian-11-r38
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+    depends_on:
+      - zookeeper
+    networks:
+      - node-network
+
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+
+    
+networks:
+  node-network:
+    driver: bridge
